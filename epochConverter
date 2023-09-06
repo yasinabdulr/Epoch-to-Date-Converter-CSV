@@ -1,0 +1,60 @@
+import pandas as pd
+from datetime import datetime
+import os
+
+def epoch_to_human_readable(epoch_microseconds):
+    # Convert microseconds to seconds
+    epoch_seconds = epoch_microseconds / 1e6
+    
+    # Convert to datetime and return as string
+    dt = datetime.fromtimestamp(epoch_seconds)
+    return dt.strftime('%Y-%m-%d %H:%M:%S')
+
+def is_likely_epoch_microseconds(value):
+    try:
+        # Check if value is an integer and its length is between 13 to 17 digits
+        return isinstance(int(value), int) and 13 <= len(str(value)) <= 17
+    except:
+        return False
+
+def discover_timestamp_columns(input_file):
+    # Read the first 10 rows of the CSV
+    df_sample = pd.read_csv(input_file, nrows=10)
+    
+    potential_timestamp_columns = []
+    
+    # Check each column for epoch timestamps in the sample
+    for column in df_sample.columns:
+        if df_sample[column].dropna().apply(is_likely_epoch_microseconds).mean() > 0.9:
+            # If more than 90% of the non-null values in the sample are likely epoch timestamps
+            potential_timestamp_columns.append(column)
+    
+    return potential_timestamp_columns
+
+def convert_csv_timestamps(input_file):
+    timestamp_columns = discover_timestamp_columns(input_file)
+    
+    # If no timestamp columns found, return without modifications
+    if not timestamp_columns:
+        print("No epoch timestamp columns discovered.")
+        return None
+    
+    # Read the entire CSV file
+    df = pd.read_csv(input_file)
+    
+    # Convert columns that were identified as epoch timestamps
+    for column in timestamp_columns:
+        df[column] = df[column].apply(epoch_to_human_readable)
+    
+    # Create the output file name
+    output_file = os.path.splitext(input_file)[0] + "_converted.csv"
+    
+    # Save the transformed data back to CSV
+    df.to_csv(output_file, index=False)
+    
+    return output_file
+
+if __name__ == "__main__":
+    file_path = input("Enter the path to your file: ")
+    output_path = convert_csv_timestamps(file_path)
+    print(f"Timestamps converted and saved to: {output_path}")
